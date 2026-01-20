@@ -2,15 +2,25 @@ import { format, formatDistance, formatRelative, subDays } from "date-fns";
 import { id } from "date-fns/locale";
 
 // Format currency
-export const formatCurrency = (amount) => {
-  if (amount === null || amount === undefined) return "Rp0";
+export function formatCurrency(amount, currency = "IDR") {
+  if (amount === null || amount === undefined) return "Rp 0";
+
+  // Format Rupiah Indonesia
+  if (currency === "IDR") {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
+  // Format umum untuk currency lain
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    currency: currency,
   }).format(amount);
-};
+}
 
 // Format date
 export const formatDate = (date, formatStr = "dd MMM yyyy") => {

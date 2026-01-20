@@ -18,27 +18,49 @@ const fetchCustomers = async () => {
 
     console.log("🔍 DEBUG Customers API Response:", {
       status: response.status,
-      dataStructure: Object.keys(response.data),
-      hasDataArray: Array.isArray(response.data.data),
-      firstCustomer: response.data.data?.[0]
-        ? {
-            id: response.data.data[0].id,
-            name: response.data.data[0].name,
-            status: response.data.data[0].status,
-            expired_at: response.data.data[0].expired_at,
-          }
-        : "No customers",
+      data: response.data,
+      fullResponse: response,
     });
 
+    // Handle multiple possible response structures
+    let customers = [];
+    let total = 0;
+    let pagination = {};
+
+    if (response.data && response.data.success !== false) {
+      // Structure 1: { success: true, data: [...], pagination: {...} }
+      if (Array.isArray(response.data.data)) {
+        customers = response.data.data;
+        total = response.data.pagination?.total || response.data.data.length;
+        pagination = response.data.pagination || {};
+      }
+      // Structure 2: Direct array response
+      else if (Array.isArray(response.data)) {
+        customers = response.data;
+        total = response.data.length;
+      }
+      // Structure 3: { customers: [...], total: ... }
+      else if (
+        response.data.customers &&
+        Array.isArray(response.data.customers)
+      ) {
+        customers = response.data.customers;
+        total = response.data.total || response.data.customers.length;
+      }
+    }
+
+    console.log("✅ Processed customers:", customers.length, "items");
+
     return {
-      customers: response.data.data || [],
-      total: response.data.pagination?.total || response.data.data?.length || 0,
-      pagination: response.data.pagination,
+      customers,
+      total,
+      pagination,
     };
   } catch (error) {
     console.error("❌ Fetch customers error:", error);
+    console.error("❌ Error details:", error.response?.data);
     toast.error("Failed to load customers");
-    return { customers: [], total: 0 };
+    return { customers: [], total: 0, pagination: {} };
   }
 };
 
@@ -409,7 +431,7 @@ export default function CustomersPage() {
   ];
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
       <div className="mb-6">
         <div className="flex justify-between items-center">
           <div>

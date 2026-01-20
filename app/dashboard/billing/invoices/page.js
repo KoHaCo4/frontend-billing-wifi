@@ -10,34 +10,21 @@ import Button from "@/components/UI/Button";
 import StatusBadge from "@/components/UI/StatusBadge";
 import InvoiceForm from "@/components/Invoices/InvoiceForm";
 import { api } from "@/lib/api";
+import { useInvoiceMutations } from "@/hooks/useInvoices";
 
 // API functions dengan filter status
 const fetchInvoices = async (statusFilter = "all") => {
   try {
-    console.log("📦 Fetching invoices with filter:", statusFilter);
-
-    // Tambahkan parameter status jika bukan 'all'
     const params = {};
     if (statusFilter !== "all") {
       params.status = statusFilter;
     }
 
     const response = await api.get("/invoices", { params });
-
-    console.log("✅ Invoice API Response:", {
-      success: response.data.success,
-      dataLength: response.data.data?.length,
-      pagination: response.data.pagination,
-    });
-
-    // Urutkan data: pending dulu, lalu created_at terbaru
     let invoices = response.data.data || [];
 
-    // Urutkan berdasarkan:
-    // 1. Status: pending > overdue > paid > cancelled
-    // 2. Tanggal: terbaru ke terlama
+    // Urutkan berdasarkan status dan tanggal
     invoices.sort((a, b) => {
-      // Priority order untuk status
       const statusOrder = {
         pending: 1,
         overdue: 2,
@@ -48,12 +35,10 @@ const fetchInvoices = async (statusFilter = "all") => {
       const statusA = a.display_status || a.status;
       const statusB = b.display_status || b.status;
 
-      // Jika status berbeda, urutkan berdasarkan priority
       if (statusOrder[statusA] !== statusOrder[statusB]) {
         return statusOrder[statusA] - statusOrder[statusB];
       }
 
-      // Jika status sama, urutkan berdasarkan created_at (terbaru dulu)
       const dateA = new Date(a.created_at || a.issue_date);
       const dateB = new Date(b.created_at || b.issue_date);
       return dateB - dateA;
@@ -66,53 +51,13 @@ const fetchInvoices = async (statusFilter = "all") => {
     };
   } catch (error) {
     console.error("❌ Fetch invoices error:", error);
-
-    if (error.response) {
-      console.error("Error status:", error.response.status);
-      console.error("Error data:", error.response.data);
-    }
-
     toast.error("Failed to load invoices");
     return { invoices: [], total: 0, filteredCount: 0 };
   }
 };
 
-// Function untuk mark invoice as paid
-const payInvoice = async ({ invoiceId, amount, payment_method = "cash" }) => {
-  try {
-    console.log("💳 Paying invoice with data:", {
-      invoiceId,
-      amount,
-      payment_method,
-    });
-
-    // Convert amount to number
-    const paymentAmount = parseFloat(amount);
-
-    if (isNaN(paymentAmount) || paymentAmount <= 0) {
-      throw new Error("Invalid payment amount");
-    }
-
-    const response = await api.post(`/invoices/${invoiceId}/pay`, {
-      amount: paymentAmount,
-      payment_method,
-      reference: `PAY-${Date.now()}`,
-      notes: "Payment processed via dashboard",
-    });
-
-    console.log("✅ Payment response:", response.data);
-    return response.data;
-  } catch (error) {
-    console.error("❌ Pay invoice error:", {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    });
-    throw error;
-  }
-};
-
 export default function InvoicesPage() {
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [viewMode, setViewMode] = useState("form");
@@ -122,27 +67,15 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const queryClient = useQueryClient();
-
-  // Fungsi untuk handle klik tombol bayar
-  const handlePayClick = (invoice) => {
-    setInvoiceToPay(invoice);
-    setShowPayConfirmModal(true);
-  };
-
-  // Fungsi untuk konfirmasi pembayaran
-  const confirmPayment = () => {
-    if (!invoiceToPay) return;
-
-    payMutation.mutate({
-      invoiceId: invoiceToPay.id,
-      amount: invoiceToPay.amount,
-      payment_method: paymentMethod,
-    });
-
-    setShowPayConfirmModal(false);
-    setInvoiceToPay(null);
-  };
+  // Gunakan custom hook untuk mutations
+  const {
+    payInvoice,
+    isPaying,
+    deleteInvoice,
+    isDeleting,
+    cancelInvoice,
+    isCancelling,
+  } = useInvoiceMutations();
 
   // Fetch invoices dengan filter status
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -165,94 +98,25 @@ export default function InvoicesPage() {
       );
     }) || [];
 
-  // Pay mutation
-  const payMutation = useMutation({
-    mutationFn: payInvoice,
-    onSuccess: (data) => {
-      // Tampilkan informasi perpanjangan jika ada
-      if (data.data?.customer_extended) {
-        toast.success(
-          <div>
-            <p className="font-medium">Invoice paid successfully!</p>
-            <p className="text-sm mt-1">
-              Customer subscription has been extended.
-            </p>
-          </div>
-        );
-      } else {
-        toast.success("Invoice paid successfully!");
-      }
+  // Fungsi untuk handle klik tombol bayar
+  const handlePayClick = (invoice) => {
+    setInvoiceToPay(invoice);
+    setShowPayConfirmModal(true);
+  };
 
-      queryClient.invalidateQueries(["invoices"]);
-      queryClient.invalidateQueries(["customers"]);
-    },
-    onError: (error) => {
-      console.error("Payment error:", error);
-      toast.error(error.response?.data?.message || "Failed to process payment");
-    },
-  });
+  // Fungsi untuk konfirmasi pembayaran
+  const confirmPayment = () => {
+    if (!invoiceToPay) return;
 
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (invoiceId) => {
-      const response = await api.delete(`/invoices/${invoiceId}`);
-      return response.data;
-    },
-    onSuccess: () => {
-      toast.success("Invoice deleted successfully");
-      queryClient.invalidateQueries(["invoices"]);
-    },
-    onError: (error) => {
-      console.error("Delete invoice error:", error);
+    payInvoice({
+      invoiceId: invoiceToPay.id,
+      amount: invoiceToPay.amount,
+      paymentMethod: paymentMethod,
+    });
 
-      if (error.response?.data?.code === "HAS_PAYMENTS") {
-        toast.error(
-          <div>
-            <p className="font-medium">Cannot Delete Invoice</p>
-            <p className="text-sm mt-1">{error.response.data.message}</p>
-            <p className="text-xs mt-2 text-gray-600">
-              ❌ Please cancel the invoice instead, or delete payments first.
-            </p>
-            <button
-              onClick={() => {
-                if (error.response?.data?.code === "HAS_PAYMENTS") {
-                  // Offer to cancel instead
-                  if (
-                    confirm("Would you like to cancel this invoice instead?")
-                  ) {
-                    cancelMutation.mutate(error.config.url.split("/").pop());
-                  }
-                }
-              }}
-              className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-            >
-              Cancel Invoice Instead
-            </button>
-          </div>,
-          { duration: 8000 }
-        );
-      } else {
-        toast.error(
-          error.response?.data?.message || "Failed to delete invoice"
-        );
-      }
-    },
-  });
-
-  // Cancel mutation
-  const cancelMutation = useMutation({
-    mutationFn: async (invoiceId) => {
-      const response = await api.post(`/invoices/${invoiceId}/cancel`);
-      return response.data;
-    },
-    onSuccess: () => {
-      toast.success("Invoice cancelled successfully");
-      queryClient.invalidateQueries(["invoices"]);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || "Failed to cancel invoice");
-    },
-  });
+    setShowPayConfirmModal(false);
+    setInvoiceToPay(null);
+  };
 
   // Statistik berdasarkan data yang difilter
   const getStatistics = () => {
@@ -367,7 +231,7 @@ export default function InvoicesPage() {
                   }}
                   className="text-green-600 hover:text-green-900 p-1"
                   title="Mark as Paid"
-                  disabled={payMutation.isLoading}
+                  disabled={isPaying}
                 >
                   <CheckCircle className="w-4 h-4" />
                 </button>
@@ -376,12 +240,12 @@ export default function InvoicesPage() {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (confirm(`Cancel invoice ${row.invoice_number}?`)) {
-                      cancelMutation.mutate(row.id);
+                      cancelInvoice(row.id);
                     }
                   }}
                   className="text-orange-600 hover:text-orange-900 p-1"
                   title="Cancel Invoice"
-                  disabled={cancelMutation.isLoading}
+                  disabled={isCancelling}
                 >
                   <svg
                     className="w-4 h-4"
@@ -404,12 +268,12 @@ export default function InvoicesPage() {
               onClick={(e) => {
                 e.stopPropagation();
                 if (confirm(`Delete invoice ${row.invoice_number}?`)) {
-                  deleteMutation.mutate(row.id);
+                  deleteInvoice(row.id);
                 }
               }}
               className="text-red-600 hover:text-red-900 p-1"
               title="Delete Invoice"
-              disabled={deleteMutation.isLoading || isPaid || isCancelled}
+              disabled={isDeleting || isPaid || isCancelled}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -449,7 +313,8 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="mb-6">
         <div className="flex justify-between items-center">
           <div>
@@ -485,9 +350,10 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter dan Pencarian */}
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Filter Status */}
           <div className="flex flex-wrap gap-2">
             {statusOptions.map((option) => (
               <button
@@ -498,12 +364,12 @@ export default function InvoicesPage() {
                     ? option.value === "all"
                       ? "bg-gray-800 text-white"
                       : option.value === "pending"
-                      ? "bg-yellow-500 text-white"
-                      : option.value === "overdue"
-                      ? "bg-red-500 text-white"
-                      : option.value === "paid"
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-500 text-white"
+                        ? "bg-yellow-500 text-white"
+                        : option.value === "overdue"
+                          ? "bg-red-500 text-white"
+                          : option.value === "paid"
+                            ? "bg-green-500 text-white"
+                            : "bg-gray-500 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
@@ -514,12 +380,12 @@ export default function InvoicesPage() {
                     {option.value === "all"
                       ? stats.total
                       : option.value === "pending"
-                      ? stats.pending
-                      : option.value === "overdue"
-                      ? stats.overdue
-                      : option.value === "paid"
-                      ? stats.paid
-                      : stats.cancelled}
+                        ? stats.pending
+                        : option.value === "overdue"
+                          ? stats.overdue
+                          : option.value === "paid"
+                            ? stats.paid
+                            : stats.cancelled}
                   </span>
                 )}
               </button>
@@ -569,7 +435,7 @@ export default function InvoicesPage() {
             <span className="font-semibold text-red-600">
               {stats.overdue} overdue
             </span>{" "}
-            invoices need your attention. New invoices appear at the top.
+            invoices need your attention.
           </span>
         </div>
       </div>
@@ -580,7 +446,7 @@ export default function InvoicesPage() {
           columns={columns}
           data={filteredInvoices}
           loading={isLoading}
-          searchable={false} // We're using custom search
+          searchable={false}
           pagination={true}
           itemsPerPage={10}
           onRowClick={(row) => {
@@ -668,7 +534,7 @@ export default function InvoicesPage() {
                       <p className="font-medium">
                         Rp{" "}
                         {parseFloat(invoiceToPay.amount).toLocaleString(
-                          "id-ID"
+                          "id-ID",
                         )}
                       </p>
                     </div>
@@ -677,39 +543,19 @@ export default function InvoicesPage() {
                         Payment Method
                       </p>
                       <div className="flex gap-3">
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="payment_method"
-                            value="cash"
-                            checked={paymentMethod === "cash"}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Cash</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="payment_method"
-                            value="transfer"
-                            checked={paymentMethod === "transfer"}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Transfer</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="payment_method"
-                            value="qris"
-                            checked={paymentMethod === "qris"}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>QRIS</span>
-                        </label>
+                        {["cash", "transfer", "qris", "other"].map((method) => (
+                          <label key={method} className="flex items-center">
+                            <input
+                              type="radio"
+                              name="payment_method"
+                              value={method}
+                              checked={paymentMethod === method}
+                              onChange={(e) => setPaymentMethod(e.target.value)}
+                              className="mr-2"
+                            />
+                            <span className="capitalize">{method}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -723,14 +569,14 @@ export default function InvoicesPage() {
                     setShowPayConfirmModal(false);
                     setInvoiceToPay(null);
                   }}
-                  disabled={payMutation.isLoading}
+                  disabled={isPaying}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={confirmPayment}
-                  loading={payMutation.isLoading}
-                  disabled={payMutation.isLoading}
+                  loading={isPaying}
+                  disabled={isPaying}
                 >
                   Confirm Payment
                 </Button>
@@ -833,14 +679,6 @@ function InvoiceDetail({ invoice }) {
             </p>
           </div>
         )}
-        {invoice.created_at && (
-          <div>
-            <p className="text-sm text-gray-600">Created At</p>
-            <p className="font-medium">
-              {new Date(invoice.created_at).toLocaleDateString("id-ID")}
-            </p>
-          </div>
-        )}
       </div>
 
       {invoice.description && (
@@ -852,12 +690,10 @@ function InvoiceDetail({ invoice }) {
         </div>
       )}
 
-      {/* Action Buttons */}
       <div className="flex justify-end gap-3 pt-4 border-t">
         <Button
           variant="outline"
           onClick={() => {
-            window.open(`/api/invoices/${invoice.id}/print`, "_blank");
             toast.success("Print feature coming soon!");
           }}
         >
