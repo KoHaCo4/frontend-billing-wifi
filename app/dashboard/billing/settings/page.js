@@ -21,7 +21,8 @@ import {
   TestTube,
 } from "lucide-react";
 import Card from "@/components/UI/Card";
-import TestResultModal from "@/components/UI/TestResultModal"; // <-- IMPORT MODAL
+import TestResultModal from "@/components/UI/TestResultModal";
+import TestNotification from "@/components/Notification/TestNotification";
 
 export default function SettingsPage() {
   const {
@@ -54,7 +55,7 @@ export default function SettingsPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/settings`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       const data = await response.json();
       console.log("✅ GET /settings:", data);
@@ -77,7 +78,7 @@ export default function SettingsPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(testData),
-        }
+        },
       );
 
       const data = await response.json();
@@ -150,7 +151,7 @@ export default function SettingsPage() {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -186,12 +187,12 @@ export default function SettingsPage() {
 
         // Tampilkan notifikasi
         const successCount = testResults.filter(
-          (r) => r.status === "active"
+          (r) => r.status === "active",
         ).length;
         const totalCount = testResults.length;
 
         toast.success(
-          `✅ Tes selesai! ${successCount} dari ${totalCount} router aktif`
+          `✅ Tes selesai! ${successCount} dari ${totalCount} router aktif`,
         );
       } else {
         toast.error(`❌ ${data.message || "Test failed"}`);
@@ -309,7 +310,7 @@ export default function SettingsPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(testData),
-        }
+        },
       );
 
       const result = await response.json();
@@ -383,7 +384,7 @@ export default function SettingsPage() {
             Authorization: `Bearer ${token}`,
             "Cache-Control": "no-cache",
           },
-        }
+        },
       );
 
       console.log("Response status:", response.status);
@@ -466,7 +467,7 @@ export default function SettingsPage() {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
           },
-        }
+        },
       );
 
       if (response.ok) {
@@ -502,7 +503,7 @@ export default function SettingsPage() {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
           },
-        }
+        },
       );
 
       console.log("Job logs response status:", response.status);
@@ -579,7 +580,7 @@ export default function SettingsPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(completeData),
-        }
+        },
       );
 
       const result = await response.json();
@@ -611,7 +612,7 @@ export default function SettingsPage() {
   const handleReset = () => {
     if (
       window.confirm(
-        "Apakah Anda yakin ingin mengembalikan ke pengaturan default?"
+        "Apakah Anda yakin ingin mengembalikan ke pengaturan default?",
       )
     ) {
       reset(defaultSettings);
@@ -631,7 +632,7 @@ export default function SettingsPage() {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
           },
-        }
+        },
       );
 
       const result = await response.json();
@@ -1022,6 +1023,35 @@ export default function SettingsPage() {
             </button>
           </div>
         </Card>
+        {/* WhatsApp Notification Settings */}
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Notifikasi WhatsApp</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium">Pengaturan Fonnte</h3>
+                <p className="text-sm text-gray-600">
+                  Konfigurasi notifikasi otomatis ke WhatsApp pelanggan
+                </p>
+              </div>
+              <TestNotification />
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-2">Status:</h4>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="text-sm">
+                  Notifikasi aktif (jalan setiap jam 09:00)
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Notifikasi akan dikirim ke pelanggan 1 hari sebelum masa aktif
+                berakhir
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* Notifications Settings */}
         <Card title="Pengaturan Notifikasi" className="mb-6">
@@ -1135,8 +1165,8 @@ export default function SettingsPage() {
                           log.status === "success"
                             ? "bg-green-100 text-green-800"
                             : log.status === "failed"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-yellow-100 text-yellow-800"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
                         {log.status}
