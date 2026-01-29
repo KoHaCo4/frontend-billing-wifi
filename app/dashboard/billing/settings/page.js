@@ -41,7 +41,10 @@ export default function SettingsPage() {
   const [showTestResults, setShowTestResults] = useState(false);
   const [testResults, setTestResults] = useState([]);
   const [isTesting, setIsTesting] = useState(false);
-  // ================================
+
+  const [testPhone, setTestPhone] = useState("");
+  const [isTestingWhatsApp, setIsTestingWhatsApp] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState("checking");
 
   // Tambahkan di useEffect utama
   const testSettingsAPI = async () => {
@@ -127,6 +130,16 @@ export default function SettingsPage() {
       notifyOnPayment: true,
       notifyBeforeExpiry: true,
       daysBeforeExpiry: 3,
+    },
+    whatsapp: {
+      enableReminder: true,
+      reminderSchedule: "0 9 * * *", // Jam 09:00 setiap hari
+      daysBefore: [3, 1], // H-3 dan H-1
+      enablePaymentLinks: true,
+      testPhoneNumber: "",
+      companyName: "Billing WiFi",
+      companyPhone: "081234567890",
+      paymentLinkExpiryHours: 24,
     },
   };
 
@@ -366,6 +379,90 @@ export default function SettingsPage() {
     }
   };
 
+  // Fungsi untuk test WhatsApp
+  const testWhatsApp = async () => {
+    if (!testPhone) {
+      toast.error("Masukkan nomor telepon test");
+      return;
+    }
+
+    setIsTestingWhatsApp(true);
+    try {
+      toast.loading("Mengirim pesan test...");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/customer-reminder/test`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          },
+          body: JSON.stringify({ phone: testPhone }),
+        },
+      );
+
+      const result = await response.json();
+      toast.dismiss();
+
+      if (result.success) {
+        toast.success("✅ Pesan test terkirim!");
+      } else {
+        toast.error(`❌ Gagal: ${result.message || "Unknown error"}`);
+      }
+    } catch (error) {
+      toast.dismiss();
+      toast.error(`❌ Error: ${error.message}`);
+      console.error("Test WhatsApp error:", error);
+    } finally {
+      setIsTestingWhatsApp(false);
+    }
+  };
+
+  // Fungsi untuk cek status WhatsApp
+  const checkWhatsAppStatus = async () => {
+    try {
+      setWhatsappStatus("checking");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/customer-reminder/status`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          },
+        },
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setWhatsappStatus(
+            result.data.connected ? "connected" : "disconnected",
+          );
+          toast.success(
+            "Status WhatsApp: " +
+              (result.data.connected ? "TERHUBUNG" : "TERPUTUS"),
+          );
+        } else {
+          setWhatsappStatus("error");
+          toast.error("Gagal memeriksa status");
+        }
+      } else {
+        setWhatsappStatus("error");
+        toast.error("Endpoint status tidak ditemukan");
+      }
+    } catch (error) {
+      console.error("Check WhatsApp status error:", error);
+      setWhatsappStatus("error");
+      toast.error("Error memeriksa status");
+    }
+  };
+
+  // Panggil checkWhatsAppStatus saat load
+  useEffect(() => {
+    checkWhatsAppStatus();
+  }, []);
+
   const loadSettings = async () => {
     setLoading(true);
     try {
@@ -424,6 +521,10 @@ export default function SettingsPage() {
           notifications: {
             ...defaultSettings.notifications,
             ...(result.data.notifications || {}),
+          },
+          whatsapp: {
+            ...defaultSettings.whatsapp,
+            ...(result.data.whatsapp || {}),
           },
         };
 
@@ -546,15 +647,44 @@ export default function SettingsPage() {
     }
   };
 
+  // Di fungsi onSubmit(), tambahkan konversi yang benar:
   const onSubmit = async (formData) => {
     setSaving(true);
     try {
       console.log("💾 Saving settings...", formData);
+      console.log("📱 WhatsApp data from form:", formData.whatsapp);
 
       const token = localStorage.getItem("access_token");
       if (!token) {
         throw new Error("Please login again");
       }
+
+      // KONVERSI daysBefore DARI CHECKBOX KE ARRAY NUMBER
+      const formElements = document.querySelectorAll(
+        'input[name="whatsapp.daysBefore"]:checked',
+      );
+      const daysBeforeArray = Array.from(formElements).map((el) =>
+        parseInt(el.value),
+      );
+
+      // Jika tidak ada yang dicentang, gunakan default [3, 1]
+      const daysBefore = daysBeforeArray.length > 0 ? daysBeforeArray : [3, 1];
+
+      // Pastikan semua data WhatsApp ada
+      const whatsappData = {
+        enableReminder: formData.whatsapp?.enableReminder ?? true,
+        reminderSchedule: formData.whatsapp?.reminderSchedule || "*/2 * * * *",
+        daysBefore: daysBefore,
+        enablePaymentLinks: formData.whatsapp?.enablePaymentLinks ?? true,
+        testPhoneNumber: formData.whatsapp?.testPhoneNumber || "",
+        companyName: formData.whatsapp?.companyName || "Billing WiFi",
+        companyPhone: formData.whatsapp?.companyPhone || "",
+        paymentLinkExpiryHours: formData.whatsapp?.paymentLinkExpiryHours
+          ? parseInt(formData.whatsapp.paymentLinkExpiryHours)
+          : 24,
+      };
+
+      console.log("✅ WhatsApp data after processing:", whatsappData);
 
       const completeData = {
         ...defaultSettings,
@@ -567,6 +697,8 @@ export default function SettingsPage() {
           ...defaultSettings.notifications,
           ...formData.notifications,
         },
+        // GUNAKAN WHATSAPP DATA YANG SUDAH DIPROSES
+        whatsapp: whatsappData,
       };
 
       console.log("📦 Complete data to save:", completeData);
@@ -1023,35 +1155,220 @@ export default function SettingsPage() {
             </button>
           </div>
         </Card>
-        {/* WhatsApp Notification Settings */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Notifikasi WhatsApp</h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium">Pengaturan Fonnte</h3>
-                <p className="text-sm text-gray-600">
-                  Konfigurasi notifikasi otomatis ke WhatsApp pelanggan
-                </p>
-              </div>
-              <TestNotification />
-            </div>
 
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-2">Status:</h4>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-sm">
-                  Notifikasi aktif (jalan setiap jam 09:00)
+        {/* WhatsApp Notification Settings */}
+        <Card title="Pengaturan WhatsApp" className="mb-6">
+          <div className="space-y-6">
+            {/* Enable/Disable */}
+            <div>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  {...register("whatsapp.enableReminder")}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-900">
+                  Aktifkan Notifikasi WhatsApp Otomatis
                 </span>
-              </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Notifikasi akan dikirim ke pelanggan 1 hari sebelum masa aktif
-                berakhir
+              </label>
+              <p className="ml-6 text-xs text-gray-500 mt-1">
+                Sistem akan mengirim reminder otomatis ke pelanggan sebelum masa
+                aktif berakhir
               </p>
             </div>
+
+            {/* Jadwal Pengiriman */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Jadwal Kirim Reminder (Cron)
+                </label>
+                <input
+                  type="text"
+                  {...register("whatsapp.reminderSchedule")}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0 9 * * *"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Format cron: menit jam hari bulan hari-minggu
+                </p>
+                <div className="mt-2 text-xs text-gray-600 space-y-1">
+                  <div>
+                    <strong>Contoh:</strong>
+                  </div>
+                  <div>0 9 * * * = Setiap hari jam 09:00</div>
+                  <div>0 9,15 * * * = Jam 09:00 dan 15:00</div>
+                  <div>*/10 * * * * = Setiap 10 menit</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Kirim Reminder (H-)
+                </label>
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+                    <label key={day} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        value={day}
+                        {...register("whatsapp.daysBefore")}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        H-{day} ({day} hari sebelum expired)
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Pilih hari-hari sebelum expired untuk kirim reminder
+                </p>
+              </div>
+            </div>
+
+            {/* Payment Link Settings */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium text-gray-900 mb-3">Payment Link</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="flex items-center mb-3">
+                    <input
+                      type="checkbox"
+                      {...register("whatsapp.enablePaymentLinks")}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-900">
+                      Sertakan Payment Link di Pesan
+                    </span>
+                  </label>
+                  <p className="ml-6 text-xs text-gray-500">
+                    Jika aktif, pesan akan mengandung link pembayaran langsung
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Masa Aktif Payment Link (jam)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="168"
+                    {...register("whatsapp.paymentLinkExpiryHours")}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Payment link akan expired setelah X jam
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Company Info */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium text-gray-900 mb-3">
+                Info Perusahaan
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nama Perusahaan
+                  </label>
+                  <input
+                    type="text"
+                    {...register("whatsapp.companyName")}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Billing WiFi"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nomor Telepon Perusahaan
+                  </label>
+                  <input
+                    type="text"
+                    {...register("whatsapp.companyPhone")}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="081234567890"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Test WhatsApp */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium text-gray-900 mb-3">Test WhatsApp</h4>
+              <div className="flex items-end gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nomor Test (tanpa +62)
+                  </label>
+                  <input
+                    type="text"
+                    value={testPhone}
+                    onChange={(e) => setTestPhone(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="81234567890"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={testWhatsApp}
+                  disabled={isTestingWhatsApp || !testPhone}
+                  className={`px-4 py-2 rounded-md flex items-center gap-2 ${
+                    isTestingWhatsApp || !testPhone
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-green-100 text-green-700 hover:bg-green-200"
+                  }`}
+                >
+                  {isTestingWhatsApp ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                      Mengirim...
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="w-4 h-4" />
+                      Test WhatsApp
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Kirim pesan test ke nomor ini untuk memastikan konfigurasi
+                berfungsi
+              </p>
+            </div>
+
+            {/* Status WhatsApp Service */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium text-gray-900 mb-3">Status Service</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div
+                    className={`w-3 h-3 rounded-full mr-2 ${whatsappStatus === "connected" ? "bg-green-500" : whatsappStatus === "disconnected" ? "bg-red-500" : "bg-yellow-500"}`}
+                  ></div>
+                  <span className="text-sm">
+                    {whatsappStatus === "connected"
+                      ? "✅ Terhubung ke WhatsApp"
+                      : whatsappStatus === "disconnected"
+                        ? "❌ Tidak terhubung"
+                        : "⏳ Mengecek status..."}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={checkWhatsAppStatus}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Refresh Status
+                </button>
+              </div>
+            </div>
           </div>
-        </section>
+        </Card>
 
         {/* Notifications Settings */}
         <Card title="Pengaturan Notifikasi" className="mb-6">
