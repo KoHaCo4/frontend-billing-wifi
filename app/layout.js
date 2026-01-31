@@ -1,18 +1,33 @@
-// app/layout.js - TAMBAHKAN LOADING STATE
 "use client";
 
 import { useEffect, useState } from "react";
-import { Providers } from "./providers";
+import Providers from "./providers";
 import "./globals.css";
 
 export default function RootLayout({ children }) {
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState(
-    "Initializing application..."
+    "Initializing application...",
   );
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     console.log("🌐 App Mounted");
+
+    // Skip loading untuk payment routes
+    const currentPath = window.location.pathname;
+    const skipLoadingPaths = ["/dashboard", "/auth/login", "/payment", "/pay"];
+
+    const shouldSkipLoading = skipLoadingPaths.some((path) =>
+      currentPath.startsWith(path),
+    );
+
+    if (shouldSkipLoading) {
+      console.log("🚀 Skipping app loading for:", currentPath);
+      setIsAppLoading(false);
+      return;
+    }
 
     // Simulate app loading sequence
     const loadingSequence = [
@@ -32,7 +47,6 @@ export default function RootLayout({ children }) {
           loadNextStep();
         }, loadingSequence[currentStep]?.delay || 500);
       } else {
-        // Final delay before showing app
         setTimeout(() => {
           setIsAppLoading(false);
           console.log("✅ App loaded successfully");
@@ -41,28 +55,26 @@ export default function RootLayout({ children }) {
     };
 
     loadNextStep();
-
-    // Debug localStorage
-    console.log("📋 localStorage contents:");
-    console.log(
-      "- access_token:",
-      localStorage.getItem("access_token") ? "✅ Present" : "❌ Missing"
-    );
-    console.log(
-      "- refresh_token:",
-      localStorage.getItem("refresh_token") ? "✅ Present" : "❌ Missing"
-    );
-    console.log("- admin:", localStorage.getItem("admin"));
   }, []);
 
+  // Jika belum mounted, render minimal
+  if (!mounted) {
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <body suppressHydrationWarning>
+          <div style={{ display: "none" }}>Loading...</div>
+        </body>
+      </html>
+    );
+  }
+
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <Providers>
           {isAppLoading ? (
             <div className="loading-overlay animate-fade-in">
               <div className="loading-content">
-                {/* WiFi Themed Loading */}
                 <div className="wifi-loader">
                   <div className="wifi-circle wifi-circle-1"></div>
                   <div className="wifi-circle wifi-circle-2"></div>
@@ -79,12 +91,10 @@ export default function RootLayout({ children }) {
                   </div>
                 </div>
 
-                {/* Loading Text */}
                 <h3 className="text-xl font-semibold text-gray-800 mt-4 animate-pulse">
                   {loadingMessage}
                 </h3>
 
-                {/* Progress Bar */}
                 <div className="mt-6">
                   <div className="loading-progress-bar">
                     <div className="loading-progress-fill animate-progress"></div>
@@ -94,7 +104,6 @@ export default function RootLayout({ children }) {
                   </p>
                 </div>
 
-                {/* Loading Dots */}
                 <div className="flex-center mt-6">
                   <div className="loading-dots">
                     <div
@@ -112,7 +121,6 @@ export default function RootLayout({ children }) {
                   </div>
                 </div>
 
-                {/* Footer */}
                 <div className="mt-8 pt-4 border-t border-gray-100">
                   <p className="text-sm text-gray-500 italic">
                     "Billing WiFi Management System"

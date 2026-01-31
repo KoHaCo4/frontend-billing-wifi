@@ -1,154 +1,82 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
 
-const useMidtransSnap = () => {
+export const useMidtransSnap = () => {
   const [snap, setSnap] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Load Snap.js script
   useEffect(() => {
-    const loadSnapScript = async () => {
-      try {
-        // Get config from backend
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/payments/config/snap`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-            },
-          },
-        );
-
-        const config = await response.json();
-
-        if (!config.success) {
-          throw new Error("Failed to get Snap configuration");
-        }
-
-        // Check if script already loaded
-        if (window.snap) {
-          setSnap(window.snap);
-          setIsLoading(false);
-          return;
-        }
-
-        // Load script
-        const script = document.createElement("script");
-        script.src = config.data.isProduction
-          ? "https://app.midtrans.com/snap/snap.js"
-          : "https://app.sandbox.midtrans.com/snap/snap.js";
-        script.setAttribute("data-client-key", config.data.clientKey);
-        script.async = true;
-
-        script.onload = () => {
-          if (window.snap) {
-            setSnap(window.snap);
-            setIsLoading(false);
-          } else {
-            setError(new Error("Snap.js failed to load"));
-            setIsLoading(false);
-          }
-        };
-
-        script.onerror = () => {
-          setError(new Error("Failed to load Snap.js script"));
-          setIsLoading(false);
-        };
-
-        document.head.appendChild(script);
-      } catch (err) {
-        setError(err);
-        setIsLoading(false);
-      }
-    };
-
-    loadSnapScript();
-  }, []);
-
-  // Create payment
-  const createPayment = useCallback(async (invoiceId, options = {}) => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/payments/snap/create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-          },
-          body: JSON.stringify({ invoice_id: invoiceId }),
-        },
+    // Load Snap script dynamically
+    if (typeof window !== "undefined" && !window.snap) {
+      const script = document.createElement("script");
+      script.src = "https://app.midtrans.com/snap/snap.js";
+      script.setAttribute(
+        "data-client-key",
+        process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
       );
+      script.async = true;
 
-      const result = await response.json();
+      script.onload = () => {
+        console.log("Midtrans Snap script loaded");
+        setSnap(window.snap);
+      };
 
-      if (!result.success) {
-        throw new Error(result.message || "Failed to create payment");
-      }
+      script.onerror = () => {
+        console.error("Failed to load Midtrans Snap script");
+      };
 
-      return result;
-    } catch (err) {
-      throw err;
+      document.body.appendChild(script);
+    } else if (window.snap) {
+      setSnap(window.snap);
     }
+
+    return () => {
+      // Cleanup jika perlu
+    };
   }, []);
 
-  // Open Snap popup
-  const openSnapPopup = useCallback(
-    (snapToken, callbacks = {}) => {
-      if (!snap) {
-        throw new Error("Snap.js is not loaded");
-      }
+  const initSnap = () => {
+    if (window.snap) {
+      setSnap(window.snap);
+      return window.snap;
+    }
+    return null;
+  };
 
-      const defaultCallbacks = {
+  const createSnapTransaction = async (token, options = {}) => {
+    if (!snap) {
+      console.error("Snap not initialized");
+      return null;
+    }
+
+    return new Promise((resolve, reject) => {
+      snap.pay(token, {
+        ...options,
         onSuccess: (result) => {
           console.log("Payment success:", result);
-          if (callbacks.onSuccess) callbacks.onSuccess(result);
+          if (options.onSuccess) options.onSuccess(result);
+          resolve({ success: true, data: result });
         },
         onPending: (result) => {
           console.log("Payment pending:", result);
-          if (callbacks.onPending) callbacks.onPending(result);
+          if (options.onPending) options.onPending(result);
+          resolve({ success: true, data: result });
         },
         onError: (result) => {
           console.log("Payment error:", result);
-          if (callbacks.onError) callbacks.onError(result);
+          if (options.onError) options.onError(result);
+          reject(new Error("Payment failed"));
         },
         onClose: () => {
-          console.log("Popup closed");
-          if (callbacks.onClose) callbacks.onClose();
+          console.log("Payment popup closed");
+          if (options.onClose) options.onClose();
+          resolve({ success: false, message: "Popup closed by user" });
         },
-      };
-
-      snap.pay(snapToken, defaultCallbacks);
-    },
-    [snap],
-  );
-
-  // Check payment status
-  const checkPaymentStatus = useCallback(async (orderId) => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/payments/status/${orderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-          },
-        },
-      );
-
-      return await response.json();
-    } catch (err) {
-      throw err;
-    }
-  }, []);
+      });
+    });
+  };
 
   return {
     snap,
-    isLoading,
-    error,
-    createPayment,
-    openSnapPopup,
-    checkPaymentStatus,
+    initSnap,
+    createSnapTransaction,
   };
 };
-
-export default useMidtransSnap;

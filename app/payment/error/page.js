@@ -1,105 +1,88 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { XCircle } from "lucide-react";
 
-export default function PaymentErrorPage() {
+export default function PaymentError() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
-  const [payment, setPayment] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (orderId) {
-      fetchPaymentDetails();
-    }
-  }, [orderId]);
-
-  const fetchPaymentDetails = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/payments/status/${orderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
-
-      const result = await response.json();
-      if (result.success) {
-        setPayment(result.data);
-      }
-    } catch (error) {
-      console.error("Error fetching payment:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-6">
-          <XCircle className="w-8 h-8 text-red-600" />
-        </div>
-
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">
-          Payment Failed
-        </h1>
-        <p className="text-gray-600 mb-8">
-          Sorry, your payment could not be processed. Please try again or use
-          another payment method.
-        </p>
-
-        {loading ? (
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <XCircle className="w-10 h-10 text-red-600" />
           </div>
-        ) : (
-          payment && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
-              <h2 className="font-semibold text-gray-700 mb-4">
-                Payment Details
-              </h2>
-              <div className="space-y-3">
+
+          <h1 className="text-3xl font-bold text-gray-800 mb-3">
+            Pembayaran Gagal
+          </h1>
+
+          <p className="text-gray-600 mb-6">
+            Maaf, pembayaran Anda tidak dapat diproses. Silakan coba lagi atau
+            gunakan metode pembayaran lain.
+          </p>
+
+          {orderId && (
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+              <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Order ID:</span>
-                  <span className="font-medium">{payment.orderId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Amount:</span>
-                  <span className="font-medium">
-                    Rp {payment.amount.toLocaleString("id-ID")}
-                  </span>
+                  <span className="text-gray-600">No. Order:</span>
+                  <span className="font-mono font-semibold">{orderId}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status:</span>
-                  <span className="font-medium px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm">
-                    {payment.status}
-                  </span>
+                  <span className="font-semibold text-red-600">Gagal</span>
                 </div>
               </div>
             </div>
-          )
-        )}
+          )}
 
-        <div className="space-y-3">
-          <Link
-            href="/dashboard/billing/invoices"
-            className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200"
-          >
-            Try Again
-          </Link>
-          <Link
-            href="/dashboard"
-            className="block w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-4 rounded-lg transition duration-200"
-          >
-            Go to Dashboard
-          </Link>
+          <div className="space-y-4">
+            <Link
+              href={`https://wa.me/628895461944?text=Halo,%20saya%20mengalami%20kendala%20pembayaran%20dengan%20Order%20ID:%20${orderId || ""}`}
+              target="_blank"
+              className="block w-full py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition"
+            >
+              Minta Bantuan Customer Service
+            </Link>
+
+            <button
+              onClick={() => window.history.back()}
+              className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition"
+            >
+              Coba Lagi
+            </button>
+
+            <Link
+              href="/"
+              className="block w-full py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition"
+            >
+              Kembali ke Beranda
+            </Link>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <p className="text-sm text-gray-500">
+              Jika masalah berlanjut, silakan hubungi:
+            </p>
+            <div className="mt-2 space-y-1 text-sm">
+              <p>
+                📞 Customer Service:{" "}
+                <a href="tel:628895461944" className="text-blue-600">
+                  0889-5461-944
+                </a>
+              </p>
+              <p>
+                🔧 Support:{" "}
+                <a href="tel:6285724733627" className="text-blue-600">
+                  0857-2473-3627
+                </a>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

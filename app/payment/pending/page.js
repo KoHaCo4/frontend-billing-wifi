@@ -1,138 +1,91 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Clock } from "lucide-react";
 
-export default function PaymentPendingPage() {
+export default function PaymentPending() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
-  const [payment, setPayment] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (orderId) {
-      fetchPaymentDetails();
-      // Poll for status updates
-      const interval = setInterval(fetchPaymentDetails, 10000); // Every 10 seconds
-      return () => clearInterval(interval);
-    }
-  }, [orderId]);
-
-  const fetchPaymentDetails = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/payments/status/${orderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
-
-      const result = await response.json();
-      if (result.success) {
-        setPayment(result.data);
-        // If payment is completed, redirect to success page
-        if (
-          result.data.status === "completed" ||
-          result.data.status === "paid"
-        ) {
-          window.location.href = `/payment/success?order_id=${orderId}`;
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching payment:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-6">
-          <Clock className="w-8 h-8 text-yellow-600" />
-        </div>
-
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">
-          Payment Pending
-        </h1>
-        <p className="text-gray-600 mb-4">
-          Your payment is being processed. Please complete the payment or wait
-          for confirmation.
-        </p>
-        <p className="text-sm text-gray-500 mb-8">
-          This page will automatically update when the payment is completed.
-        </p>
-
-        {loading ? (
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-amber-50 p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="w-10 h-10 text-yellow-600" />
           </div>
-        ) : (
-          payment && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
-              <h2 className="font-semibold text-gray-700 mb-4">
-                Payment Details
-              </h2>
-              <div className="space-y-3">
+
+          <h1 className="text-3xl font-bold text-gray-800 mb-3">
+            Pembayaran Pending
+          </h1>
+
+          <p className="text-gray-600 mb-6">
+            Pembayaran Anda sedang diproses. Harap tunggu konfirmasi dari
+            penyedia pembayaran.
+          </p>
+
+          {orderId && (
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+              <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Order ID:</span>
-                  <span className="font-medium">{payment.orderId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Amount:</span>
-                  <span className="font-medium">
-                    Rp {payment.amount.toLocaleString("id-ID")}
-                  </span>
+                  <span className="text-gray-600">No. Order:</span>
+                  <span className="font-mono font-semibold">{orderId}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status:</span>
-                  <span className="font-medium px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
-                    {payment.status}
+                  <span className="font-semibold text-yellow-600">
+                    Menunggu Konfirmasi
                   </span>
                 </div>
               </div>
             </div>
-          )
-        )}
+          )}
 
-        <div className="space-y-3">
-          <button
-            onClick={fetchPaymentDetails}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
-          >
-            <svg
-              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
+          <div className="space-y-4">
+            <Link
+              href={`https://wa.me/628895461944?text=Halo,%20saya%20melihat%20status%20pembayaran%20pending%20dengan%20Order%20ID:%20${orderId || ""}`}
+              target="_blank"
+              className="block w-full py-3 bg-yellow-500 text-white rounded-xl font-semibold hover:bg-yellow-600 transition"
             >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            Check Status Again
-          </button>
-          <Link
-            href="/dashboard/billing/invoices"
-            className="block w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-4 rounded-lg transition duration-200"
-          >
-            Back to Invoices
-          </Link>
+              Konfirmasi Status Pembayaran
+            </Link>
+
+            <button
+              onClick={() => window.history.back()}
+              className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition"
+            >
+              Periksa Status
+            </button>
+
+            <Link
+              href="/"
+              className="block w-full py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition"
+            >
+              Kembali ke Beranda
+            </Link>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <p className="text-sm text-gray-500">
+              Proses verifikasi pembayaran dapat memakan waktu 1-24 jam. Jika
+              status tidak berubah, hubungi:
+            </p>
+            <div className="mt-2 space-y-1 text-sm">
+              <p>
+                📞 Customer Service:{" "}
+                <a href="tel:628895461944" className="text-blue-600">
+                  0889-5461-944
+                </a>
+              </p>
+              <p>
+                🔧 Support:{" "}
+                <a href="tel:6285724733627" className="text-blue-600">
+                  0857-2473-3627
+                </a>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

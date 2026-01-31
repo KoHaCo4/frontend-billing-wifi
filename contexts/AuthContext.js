@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "react-hot-toast";
-import apiClient from "@/lib/api"; // Gunakan apiClient yang sudah ada
+import apiClient from "@/lib/api";
 
 const AuthContext = createContext({});
 
@@ -16,13 +16,18 @@ export function AuthProvider({ children }) {
 
   // Fungsi untuk menyimpan token dengan konsisten
   const saveTokens = (accessToken, refreshToken, userData) => {
-    // Simpan dengan kedua format untuk kompatibilitas
+    // Simpan di localStorage
     localStorage.setItem("access_token", accessToken);
     localStorage.setItem("accessToken", accessToken);
+
+    // SIMPAN JUGA DI COOKIES untuk middleware
+    document.cookie = `access_token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+    document.cookie = `accessToken=${accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
 
     if (refreshToken) {
       localStorage.setItem("refresh_token", refreshToken);
       localStorage.setItem("refreshToken", refreshToken);
+      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
     }
 
     if (userData) {
@@ -50,9 +55,6 @@ export function AuthProvider({ children }) {
         setUser(parsedAdmin);
         setToken(token);
         console.log("✅ User loaded:", parsedAdmin.email);
-
-        // Validasi token dengan memanggil profile
-        validateToken(token);
       } catch (error) {
         console.error("❌ Error parsing admin data:", error);
         clearAuth();
@@ -66,39 +68,41 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  // Validasi token dengan memanggil endpoint profile
-  const validateToken = async (currentToken) => {
-    try {
-      // Gunakan apiClient yang sudah memiliki interceptor
-      const response = await apiClient.getProfile();
-      console.log("✅ Token validated");
-    } catch (error) {
-      console.error("❌ Token validation failed:", error);
-      if (error.response?.status === 401) {
-        clearAuth();
-        if (pathname !== "/auth/login") {
-          router.push("/auth/login");
-        }
-      }
-    }
-  };
-
   // Cek auth status saat route berubah
   useEffect(() => {
     console.log("📍 Route changed to:", pathname);
 
     // Skip untuk route public
-    if (pathname === "/auth/login") {
-      console.log("ℹ️  Login page, skipping auth check");
+    const publicRoutes = [
+      "/auth/login",
+      "/auth",
+      "/payment",
+      "/pay",
+      "/payment/success",
+      "/payment/error",
+      "/payment/pending",
+      "/",
+    ];
+
+    const isPublicRoute = publicRoutes.some((route) => {
+      if (route === "/payment" || route === "/pay" || route === "/auth") {
+        return pathname?.startsWith(route);
+      }
+      return pathname === route;
+    });
+
+    if (isPublicRoute) {
+      console.log("ℹ️  Public route, skipping auth check");
       return;
     }
 
     const token =
       localStorage.getItem("access_token") ||
       localStorage.getItem("accessToken");
+
     console.log("🔐 Current token:", token ? "✅ Exists" : "❌ Missing");
 
-    if (!token && pathname !== "/auth/login") {
+    if (!token) {
       console.log("🚫 No token, redirecting to login");
       router.push("/auth/login");
     }
@@ -121,11 +125,11 @@ export function AuthProvider({ children }) {
 
         console.log(
           "🔑 Access Token:",
-          accessToken ? "✅ Received" : "❌ Missing"
+          accessToken ? "✅ Received" : "❌ Missing",
         );
         console.log(
           "🔄 Refresh Token:",
-          refreshToken ? "✅ Received" : "❌ Missing"
+          refreshToken ? "✅ Received" : "❌ Missing",
         );
 
         if (!accessToken) {
@@ -142,10 +146,11 @@ export function AuthProvider({ children }) {
         console.log("✅ Login successful, user:", user.email);
         toast.success("Login successful!");
 
-        // Redirect ke dashboard
+        // HAPUS redirect dari sini - biarkan useEffect yang handle
+        // atau gunakan window.location untuk hard redirect
         setTimeout(() => {
-          console.log("🚀 Redirecting to dashboard...");
-          router.push("/dashboard");
+          console.log("🚀 Hard redirecting to dashboard...");
+          window.location.href = "/dashboard";
         }, 100);
 
         return { success: true, user };
@@ -182,16 +187,16 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       console.error("❌ Logout API error:", error);
-      // Lanjutkan logout meskipun API call gagal
     }
 
     clearAuth();
     toast.success("Logged out successfully");
-    router.push("/auth/login");
+
+    // Gunakan hard redirect untuk logout
+    window.location.href = "/auth/login";
   };
 
   const clearAuth = () => {
-    // Clear semua kemungkinan key
     localStorage.removeItem("access_token");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refresh_token");
@@ -199,7 +204,6 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("admin");
     localStorage.removeItem("user");
 
-    // Clear state
     setUser(null);
     setToken(null);
   };

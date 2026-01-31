@@ -1,25 +1,23 @@
-// app/providers.js atau file providers Anda
 "use client";
 
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "react-hot-toast";
-import ProtectedRoute from "@/components/Layout/ProtectedRoute";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
-export function Providers({ children }) {
-  // Buat QueryClient instance
+// UBAH: export function Providers -> export default function Providers
+export default function Providers({ children }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000, // 1 menit
+            staleTime: 60 * 1000,
             refetchOnWindowFocus: false,
             retry: 1,
           },
         },
-      })
+      }),
   );
 
   return (
@@ -47,7 +45,8 @@ export function Providers({ children }) {
             },
           }}
         />
-        <ProtectedRoute>{children}</ProtectedRoute>
+        {/* HAPUS ProtectedRoute di sini - kita akan handle di middleware */}
+        {children}
       </AuthProvider>
     </QueryClientProvider>
   );
