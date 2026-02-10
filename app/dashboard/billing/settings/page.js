@@ -20,7 +20,7 @@ import {
   CreditCard,
   TestTube,
 } from "lucide-react";
-import Card from "@/components/UI/Card";
+import { Card } from "@/components/UI/Card";
 import TestResultModal from "@/components/UI/TestResultModal";
 import TestNotification from "@/components/Notification/TestNotification";
 

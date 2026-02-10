@@ -22,7 +22,7 @@ import {
   AlertTriangle,
   TrendingDown,
 } from "lucide-react";
-import Card from "@/components/UI/Card";
+import { Card } from "@/components/UI/Card";
 import { api } from "@/lib/api";
 import { toast } from "react-hot-toast";
 

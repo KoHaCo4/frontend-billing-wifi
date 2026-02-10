@@ -19,7 +19,7 @@ import {
   PauseCircle,
 } from "lucide-react";
 import Button from "@/components/UI/Button";
-import Card from "@/components/UI/Card";
+import { Card } from "@/components/UI/Card";
 
 export default function SuspensionDashboard() {
   const [triggerLoading, setTriggerLoading] = useState(false);
@@ -156,7 +156,7 @@ export default function SuspensionDashboard() {
       !confirm(
         `Jalankan auto-suspend sekarang? Semua pelanggan yang sudah kedaluwarsa (melewati masa tenggang ${
           stats?.grace_period_days || 3
-        } hari) akan disuspend.`
+        } hari) akan disuspend.`,
       )
     ) {
       return;
@@ -166,13 +166,13 @@ export default function SuspensionDashboard() {
     try {
       const response = await api.post("/suspension/trigger-auto-suspend");
       alert(
-        `Auto-suspend dijalankan: ${response.data.data.suspended} pelanggan berhasil disuspend`
+        `Auto-suspend dijalankan: ${response.data.data.suspended} pelanggan berhasil disuspend`,
       );
       refetchStats();
     } catch (error) {
       alert(
         "Gagal menjalankan auto-suspend: " +
-          (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message),
       );
     } finally {
       setTriggerLoading(false);
@@ -395,7 +395,7 @@ export default function SuspensionDashboard() {
                     <td className="px-4 py-3">
                       <div className="text-gray-900">
                         {new Date(customer.expired_at).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
                         )}
                       </div>
                     </td>
@@ -539,8 +539,8 @@ export default function SuspensionDashboard() {
                           log.status === "success"
                             ? "bg-green-100 text-green-800"
                             : log.status === "failed"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-yellow-100 text-yellow-800"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
                         {log.status}

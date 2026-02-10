@@ -22,6 +22,7 @@ import {
   LogOut,
   Bell,
   AlertCircle,
+  Monitor,
 } from "lucide-react";
 
 // Menu untuk kategori Billing
@@ -83,6 +84,20 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             >
               <Home className="h-5 w-5" />
               Dashboard Utama
+            </Link>
+          </div>
+
+          <div className="mb-6">
+            <Link
+              href="/dashboard/traffic"
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                pathname === "/dashboard/traffic"
+                  ? "bg-blue-50 text-blue-700 border-l-4 border-l-blue-500"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <Monitor className="h-5 w-5" />
+              Traffic Monitor
             </Link>
           </div>
 
