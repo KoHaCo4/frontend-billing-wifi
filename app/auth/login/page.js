@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@wifi.com");
+  const [email, setEmail] = useState("superadmin@test.com");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
