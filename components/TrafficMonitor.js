@@ -22,6 +22,9 @@ export default function TrafficMonitor() {
   const [customerTraffic, setCustomerTraffic] = useState({});
   const [activeSessions, setActiveSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [interfaceTraffic, setInterfaceTraffic] = useState({});
+  const [selectedInterface, setSelectedInterface] = useState(null);
+  const [interfaceList, setInterfaceList] = useState([]);
 
   const { lastMessage, isConnected } = useWebSocket();
 
@@ -76,20 +79,38 @@ export default function TrafficMonitor() {
     if (lastMessage) {
       switch (lastMessage.type) {
         case "traffic_update":
-          setTrafficData((prev) => {
-            const newData = [
-              ...prev,
-              {
-                timestamp: new Date().toISOString(),
-                ...(lastMessage.data.interfaces?.[0] || {
-                  rx_rate: 0,
-                  tx_rate: 0,
-                }),
-              },
-            ];
-            // Keep last 100 data points
-            return newData.slice(-100);
+          const interfaces = lastMessage.data.interfaces || [];
+          const timestamp =
+            lastMessage.data.timestamp || new Date().toISOString();
+
+          // Update state per interface
+          setInterfaceTraffic((prev) => {
+            const newState = { ...prev };
+            interfaces.forEach((iface) => {
+              const name = iface.interface_name;
+              if (!newState[name]) newState[name] = [];
+              newState[name].push({
+                timestamp,
+                rx_rate: iface.rx_rate,
+                tx_rate: iface.tx_rate,
+              });
+              // Keep last 100 data points per interface
+              if (newState[name].length > 100) newState[name].shift();
+            });
+            return newState;
           });
+
+          // Update daftar interface untuk dropdown
+          const names = interfaces.map((i) => i.interface_name);
+          setInterfaceList((prev) => {
+            const unique = [...new Set([...prev, ...names])];
+            return unique;
+          });
+
+          // Set interface pertama sebagai default jika belum dipilih
+          if (names.length > 0 && !selectedInterface) {
+            setSelectedInterface(names[0]);
+          }
           break;
 
         case "customer_update":
@@ -157,6 +178,31 @@ export default function TrafficMonitor() {
               {isConnected ? "Connected" : "Disconnected"}
             </Badge>
           </CardTitle>
+          <div className="flex items-center gap-4 mb-4">
+            <label
+              htmlFor="interface-select"
+              className="text-sm font-medium text-gray-700"
+            >
+              Interface:
+            </label>
+            <select
+              id="interface-select"
+              value={selectedInterface || ""}
+              onChange={(e) => setSelectedInterface(e.target.value)}
+              className="block w-48 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+              {interfaceList.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            {selectedInterface && (
+              <Badge variant="outline" className="ml-2">
+                Showing: {selectedInterface}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {/* Realtime Graph */}
