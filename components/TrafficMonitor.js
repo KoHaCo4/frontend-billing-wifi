@@ -83,36 +83,35 @@ export default function TrafficMonitor() {
           const timestamp =
             lastMessage.data.timestamp || new Date().toISOString();
 
-          // Update state per interface
           setInterfaceTraffic((prev) => {
-            const newState = { ...prev };
+            const newState = { ...prev }; // shallow copy objek
             interfaces.forEach((iface) => {
               const name = iface.interface_name;
-              if (!newState[name]) newState[name] = [];
-              newState[name].push({
+              const newEntry = {
                 timestamp,
                 rx_rate: iface.rx_rate,
                 tx_rate: iface.tx_rate,
-              });
-              // Keep last 100 data points per interface
-              if (newState[name].length > 100) newState[name].shift();
+              };
+              // Buat array baru dengan spread, lalu batasi 100 data terakhir
+              const currentArray = newState[name] || [];
+              const updatedArray = [...currentArray, newEntry].slice(-100);
+              newState[name] = updatedArray; // assign array baru
             });
             return newState;
           });
 
           // Update daftar interface untuk dropdown
-          const names = interfaces.map((i) => i.interface_name);
           setInterfaceList((prev) => {
-            const unique = [...new Set([...prev, ...names])];
-            return unique;
+            const newNames = interfaces.map((i) => i.interface_name);
+            const combined = [...prev, ...newNames];
+            return [...new Set(combined)]; // unique
           });
 
           // Set interface pertama sebagai default jika belum dipilih
-          if (names.length > 0 && !selectedInterface) {
-            setSelectedInterface(names[0]);
+          if (interfaces.length > 0 && !selectedInterface) {
+            setSelectedInterface(interfaces[0].interface_name);
           }
           break;
-
         case "customer_update":
           setCustomerTraffic((prev) => ({
             ...prev,
@@ -178,7 +177,7 @@ export default function TrafficMonitor() {
               {isConnected ? "Connected" : "Disconnected"}
             </Badge>
           </CardTitle>
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center pt-4 gap-4 mb-4">
             <label
               htmlFor="interface-select"
               className="text-sm font-medium text-gray-700"
@@ -208,7 +207,13 @@ export default function TrafficMonitor() {
           {/* Realtime Graph */}
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trafficData}>
+              <LineChart
+                data={
+                  selectedInterface
+                    ? interfaceTraffic[selectedInterface] || []
+                    : []
+                }
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis
                   dataKey="timestamp"
